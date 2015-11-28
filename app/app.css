@@ -28,3 +28,20 @@
   content: "";
   padding: 0;
 }
+
+
+/* Chart Stuff */
+#chartContainer {
+	position: fixed;
+    bottom: 0px;
+    left: 0px;
+    right: 0px;
+    height: 300px;
+    background-color: white;
+}
+
+#toggleGraphBtn {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+}
