@@ -84,6 +84,8 @@ angular.module('myApp.view1', ['ngRoute'])
       */
     };
 
+    $scope.messages = [];
+
     $scope.toggleGraph = function() {
         $scope.showGraph = !$scope.showGraph;
     };
@@ -107,6 +109,20 @@ angular.module('myApp.view1', ['ngRoute'])
 
                 // Save data point for visualisation (just the gyro value)
                 saveData( {y: msg.event[$scope.selectedSpec.coord.vector][$scope.selectedSpec.coord.axis] } );
+
+                // This is a VERY rudimentary way to get the round's duration. TODO: FIX OMG FIX. Yet somehow we don't get the duration at all!
+                if ( $scope.messages.length === 0 ||
+                     $scope.messages[ $scope.messages.length - 1 ].roundNumber < msg.roundNumber) {
+
+                    if ( $scope.messages.length !== 0 ) {
+                      $scope.messages[ $scope.messages.length - 1 ].duration = msg.event.timeStamp - $scope.messages[ $scope.messages.length - 1 ].time;
+                    }
+
+                    $scope.messages.push({
+                      time: msg.event.timeStamp,
+                      roundNumber: msg.roundNumber
+                    });
+                }
 
                 $scope.drawGraph();
             });
