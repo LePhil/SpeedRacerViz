@@ -1,6 +1,13 @@
-<p>This is the partial for view 1.</p>
+<h1>Round {{currentRound}}</h1>
+
+<h2>GyroZ</h2>
+<canvas id="gyroCanvas" width={{width}} height="250"></canvas>
+
+<h2>Power (blue) - Speed (red)</h2>
+<canvas id="speedCanvas" width={{width}} height="250"></canvas>
+
+<h2>Round Times</h2>
+<canvas id="roundCanvas" width={{width}} height="100"></canvas>
+
 <button id="start" ng-click="start()">Start</button>
 <button id="stop" ng-click="stop()">Stop</button>
-
-<div id="chartContainer" ng-show="showGraph"></div>
-<button id="toggleGraphBtn" class="btn btn-warning" ng-click="toggleGraph()">Toggle Graph</button>

@@ -9,87 +9,82 @@ angular.module('myApp.view1', ['ngRoute'])
   });
 }])
 
-.controller('View1Ctrl', ['$scope', '$stompie', function($scope, $stompie) {
-  var window = [],
-      windowSize = 10,
-      smoothingThreshold = 60,
-      originalDataPoints = {
-          type: "line",
-          name: "Original",
-          showInLegend: true,
-          dataPoints: [{y: 0}]
-      },
-      filteredDataPoints = {
-          type: "line",
-          name: "Filtered",
-          showInLegend: true,
-          dataPoints: [{y: 0}]
-      },
-      interpretedDataPoints = {
-          type: "line",
-          name: "Interpreted",
-          showInLegend: true,
-          dataPoints: [{y: 0}]
-      },
-      chart = new CanvasJS.Chart("chartContainer", {
-          zoomEnabled: true,
-          data: [ originalDataPoints, filteredDataPoints, interpretedDataPoints ]
-      }),
-      maxEntries = 100;
+.controller('View1Ctrl', ['$scope', '$stompie', '$window', function($scope, $stompie, $window) {
+    
+    var gridDef = {
+          fillStyle:'rgba(0,0,0,0.40)',
+          sharpLines: true,
+          millisPerLine: 2000,
+          verticalSections: 8
+        },
+        smoothieGyro = new SmoothieChart({
+          millisPerPixel: 20,
+          labels:{ fontSize:14, precision:0 },
+          grid: gridDef,
+          timestampFormatter: SmoothieChart.timeFormatter,
+          maxValue: 10000,
+          minValue: -10000
+        }),
+        smoothieSpeed = new SmoothieChart({
+          interpolation:'linear',
+          millisPerPixel: 20,
+          labels:{ fontSize:14, precision:0 },
+          grid: gridDef,
+          timestampFormatter: SmoothieChart.timeFormatter,
+          maxValue: 350,
+          minValue: 0
+        }),
+        smoothieRounds = new SmoothieChart({
+          interpolation:'step',
+          millisPerPixel:50,
+          labels:{ fontSize:14, precision:0 },
+          grid: {
+            fillStyle:'rgba(0,0,0,0.40)',
+            sharpLines: true,
+            millisPerLine: 2000
+          },
+          minValue: 0
+        }),
+        gyroZ = new TimeSeries(),
+        power = new TimeSeries(),
+        speed = new TimeSeries(),
+        round = new TimeSeries(),
+        lastSpeed = -1;
+    $scope.lastTime;
+    $scope.currentRound = 0;
+   
+    // Add to SmoothieChart
+    smoothieGyro.addTimeSeries(gyroZ, { strokeStyle:'#00ff00', lineWidth:3 } );
+    smoothieSpeed.addTimeSeries(power, { strokeStyle:'#ff0000', lineWidth:3 } );
+    smoothieSpeed.addTimeSeries(speed, { strokeStyle:'#0000ff', lineWidth:3 } );
+    smoothieRounds.addTimeSeries(round, { strokeStyle:'#0000ff', lineWidth:3 } );
 
-    $scope.showGraph = true;
-    $scope.selectedSpec = {description: 'Gyro Z', coord: { vector: 'g', axis: 2 },
-            range: { lower: -8000, upper: 8000}};
+    var saveData = function( msg ) {
+      var t = new Date().getTime();
+      gyroZ.append( t, msg.event['g'][2] );
+      power.append( t, msg.currentPower );
 
-    var saveData = function( dataPoint ) {
-      var y = dataPoint.y;
-
-      originalDataPoints.dataPoints.push( { y: y } );
-
-      if ( window.length >= windowSize ) {
-          window.splice(0,1);
-      }
-      window.push( y );
-
-      var winAVG = 0;
-
-      for( var i = 0; i < window.length; i++ ) {
-          winAVG += window[i];
-      }
-      winAVG /= window.length;
-
-      if ( Math.abs( y - winAVG ) > smoothingThreshold ) {
-          y = winAVG;
-      }
-
-      filteredDataPoints.dataPoints.push( { y: y } );
-
-      if ( y < -400 ) {
-          y = -4000;
-      } else if ( y > 400 ) {
-          y = 4000;
-      } else {
-          y = 0;
+      // only log speed if it actually changed
+      if ( msg.velocity != lastSpeed ) {
+        speed.append( t, msg.velocity );
+        lastSpeed = msg.velocity;
       }
 
-      interpretedDataPoints.dataPoints.push( { y: y } );
+      if ( msg.roundNumber > $scope.currentRound ) {
+        round.append( t, Math.abs($scope.lastTime - msg.event.timeStamp ) );
 
-      // have a max. number of values
-      /*
-      if (originalDataPoints.dataPoints.length > maxEntries ) {
-          originalDataPoints.dataPoints.shift();
-          filteredDataPoints.dataPoints.shift();
-          interpretedDataPoints.dataPoints.shift();
+        $scope.lastTime = msg.event.timeStamp;
+        $scope.currentRound = msg.roundNumber;
       }
-      */
-    };
+    }
 
-    $scope.toggleGraph = function() {
-        $scope.showGraph = !$scope.showGraph;
-    };
-    $scope.drawGraph = function() {
-        chart.render();
-    };
+    $scope.width = 600;
+    $scope.$watch(function(){
+      return $window.innerWidth;
+    }, function(value) {
+      console.log(value);
+      $scope.width = value;
+    });
 
     $scope.stop = function() {
       // Disconnect from the socket.
@@ -99,23 +94,24 @@ angular.module('myApp.view1', ['ngRoute'])
     };
 
     $scope.start = function() {
-        $stompie.using('http://localhost:8089/messages', function () {
 
-            // The $scope bindings are updated for you so no need to $scope.$apply.
-            // The subscription object is returned by the method.
-            var subscription = $stompie.subscribe('/topic/simulator/news', function (msg) {
+      smoothieGyro.streamTo(document.getElementById("gyroCanvas"));
+      smoothieSpeed.streamTo(document.getElementById("speedCanvas"));
+      smoothieRounds.streamTo(document.getElementById("roundCanvas"));
 
-                // Save data point for visualisation (just the gyro value)
-                saveData( {y: msg.event[$scope.selectedSpec.coord.vector][$scope.selectedSpec.coord.axis] } );
+      $stompie.using('http://localhost:8089/messages', function () {
 
-                $scope.drawGraph();
-            });
+        // The $scope bindings are updated for you so no need to $scope.$apply.
+        // The subscription object is returned by the method.
+        var subscription = $stompie.subscribe('/topic/simulator/news', function (msg) {
 
-            // Unsubscribe using said subscription object.
-            //subscription.unsubscribe();
-          });
+            // Save data point for visualisation (just the gyro value)
+            saveData( msg );
+        });
 
-      };
+      });
 
-      $scope.start();
+    };
+
+    $scope.start();
 }]);
