@@ -10,7 +10,7 @@ angular.module('myApp.view1', ['ngRoute'])
 }])
 
 .controller('View1Ctrl', ['$scope', '$stompie', '$window', function($scope, $stompie, $window) {
-    
+
     var gridDef = {
           fillStyle:'rgba(0,0,0,0.40)',
           sharpLines: true,
@@ -52,7 +52,7 @@ angular.module('myApp.view1', ['ngRoute'])
         lastSpeed = -1;
     $scope.lastTime;
     $scope.currentRound = 0;
-   
+
     // Add to SmoothieChart
     smoothieGyro.addTimeSeries(gyroZ, { strokeStyle:'#00ff00', lineWidth:3 } );
     smoothieSpeed.addTimeSeries(power, { strokeStyle:'#ff0000', lineWidth:3 } );
@@ -85,6 +85,20 @@ angular.module('myApp.view1', ['ngRoute'])
       console.log(value);
       $scope.width = value;
     });
+
+    $scope.isRunning = true;
+    $scope.pause = function() {
+      if ( $scope.isRunning )  {
+        smoothieGyro.stop();
+        smoothieSpeed.stop();
+        smoothieRounds.stop();
+      } else {
+        smoothieGyro.start();
+        smoothieSpeed.start();
+        smoothieRounds.start();
+      }
+      $scope.isRunning = !$scope.isRunning;
+    }
 
     $scope.stop = function() {
       // Disconnect from the socket.
