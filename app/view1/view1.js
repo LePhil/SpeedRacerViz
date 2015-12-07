@@ -10,6 +10,10 @@ angular.module('myApp.view1', ['ngRoute'])
 }])
 
 .controller('View1Ctrl', ['$scope', '$stompie', '$window', function($scope, $stompie, $window) {
+    $scope.gyroColor = '#00ff00';
+    $scope.powerColor = '#ff0000';
+    $scope.speedColor = '#0000ff';
+    $scope.roundColor = '#7A00ff';
 
     var gridDef = {
           fillStyle:'rgba(0,0,0,0.40)',
@@ -54,10 +58,10 @@ angular.module('myApp.view1', ['ngRoute'])
     $scope.currentRound = 0;
 
     // Add to SmoothieChart
-    smoothieGyro.addTimeSeries(gyroZ, { strokeStyle:'#00ff00', lineWidth:3 } );
-    smoothieSpeed.addTimeSeries(power, { strokeStyle:'#ff0000', lineWidth:3 } );
-    smoothieSpeed.addTimeSeries(speed, { strokeStyle:'#0000ff', lineWidth:3 } );
-    smoothieRounds.addTimeSeries(round, { strokeStyle:'#0000ff', lineWidth:3 } );
+    smoothieGyro.addTimeSeries(gyroZ, { strokeStyle: $scope.gyroColor, lineWidth:3 } );
+    smoothieSpeed.addTimeSeries(power, { strokeStyle: $scope.powerColor , lineWidth:3 } );
+    smoothieSpeed.addTimeSeries(speed, { strokeStyle: $scope.speedColor, lineWidth:3 } );
+    smoothieRounds.addTimeSeries(round, { strokeStyle: $scope.roundColor, lineWidth:3 } );
 
     var saveData = function( msg ) {
       var t = new Date().getTime();

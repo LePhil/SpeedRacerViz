@@ -1,12 +1,12 @@
 <h1>Round {{currentRound}}</h1>
 
-<h2>GyroZ</h2>
+<h2><span style="color: {{ gyroColor }}">GyroZ</span></h2>
 <canvas id="gyroCanvas" width={{width}} height="250"></canvas>
 
-<h2>Power (red) - Speed (blue)</h2>
+<h2><span style="color: {{ powerColor }}">Power</span> - <span style="color: {{ speedColor }}">Speed</span></h2>
 <canvas id="speedCanvas" width={{width}} height="250"></canvas>
 
-<h2>Round Times</h2>
+<h2><span style="color: {{ roundColor }}">Round Times</span></h2>
 <canvas id="roundCanvas" width={{width}} height="100"></canvas>
 
 <button id="start" ng-click="start()">Start</button>
