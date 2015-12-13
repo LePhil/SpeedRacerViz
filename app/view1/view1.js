@@ -14,71 +14,92 @@ angular.module('myApp.view1', ['ngRoute'])
     $scope.powerColor = '#ff0000';
     $scope.speedColor = '#0000ff';
 
+    $scope.lastTime;
+    $scope.currentRound = 0;
+
+    $scope.lowestRoundTime = -1;
+    $scope.averageRoundTime = -1;
+
     var gridDef = {
-          fillStyle:'rgba(0,0,0,0.40)',
-          sharpLines: true,
-          millisPerLine: 2000,
-          verticalSections: 8
+            fillStyle:'rgba(0,0,0,0.40)',
+            sharpLines: true,
+            millisPerLine: 2000,
+            verticalSections: 8
         },
         smoothieGyro = new SmoothieChart({
-          millisPerPixel: 20,
-          labels:{ fontSize:14, precision:0 },
-          grid: gridDef,
-          timestampFormatter: SmoothieChart.timeFormatter,
-          maxValue: 10000,
-          minValue: -10000
+            millisPerPixel: 20,
+            labels:{ fontSize:14, precision:0 },
+            grid: gridDef,
+            timestampFormatter: SmoothieChart.timeFormatter,
+            maxValue: 10000,
+            minValue: -10000
         }),
         smoothieSpeed = new SmoothieChart({
-          interpolation:'linear',
-          millisPerPixel: 20,
-          labels:{ fontSize:14, precision:0 },
-          grid: gridDef,
-          timestampFormatter: SmoothieChart.timeFormatter,
-          maxValue: 350,
-          minValue: 0
+            interpolation:'linear',
+            millisPerPixel: 20,
+            labels:{ fontSize:14, precision:0 },
+            grid: gridDef,
+            timestampFormatter: SmoothieChart.timeFormatter,
+            maxValue: 350,
+            minValue: 0
         }),
         gyroZ = new TimeSeries(),
         power = new TimeSeries(),
         speed = new TimeSeries(),
-        lastSpeed = -1;
-    $scope.lastTime;
-    $scope.currentRound = 0;
+        lastSpeed = -1,
+        roundTimeChart = new CanvasJS.Chart("roundTimesContainer", {
+        		data: [{
+        			type: "spline",
+        			dataPoints: []
+        		}]
+        }),
+        calcLowestAndAvg = function( points ) {
+            var size = points.length,
+                sum = 0,
+                lowest = Number.MAX_VALUE;
 
-    var roundTimeChart = new CanvasJS.Chart("roundTimesContainer", {
-    		data: [{
-    			type: "spline",
-    			dataPoints: []
-    		}]
-    });
+            // start at second data point because first round time is usually unusable
+            for( var i = 0; i < size; i++ ) {
+              var rt = points[i].y;
+              if ( rt < lowest ) {
+                lowest = rt;
+              }
+              sum += rt;
+            }
+
+            $scope.lowestRoundTime = lowest;
+            $scope.averageRoundTime = sum / size-1;
+        },
+        saveData = function( msg ) {
+            var t = new Date().getTime();
+            gyroZ.append( t, msg.event['g'][2] );
+            power.append( t, msg.currentPower );
+
+            // only log speed if it actually changed
+            if ( msg.velocity != lastSpeed ) {
+                speed.append( t, msg.velocity );
+                lastSpeed = msg.velocity;
+            }
+
+            if ( msg.roundNumber > $scope.currentRound ) {
+
+                var roundTime = Math.abs( $scope.lastTime - msg.event.timeStamp );
+                $scope.lastTime = msg.event.timeStamp;
+                $scope.currentRound = msg.roundNumber;
+
+                // add newest roundTime to 3rd graph
+                roundTimeChart.options.data[0].dataPoints.push({ y: roundTime });
+
+                calcLowestAndAvg( roundTimeChart.options.data[0].dataPoints );
+
+                roundTimeChart.render();
+            }
+        };
 
     // Add to SmoothieChart
     smoothieGyro.addTimeSeries(gyroZ, { strokeStyle: $scope.gyroColor, lineWidth:3 } );
     smoothieSpeed.addTimeSeries(power, { strokeStyle: $scope.powerColor , lineWidth:3 } );
     smoothieSpeed.addTimeSeries(speed, { strokeStyle: $scope.speedColor, lineWidth:3 } );
-
-    var saveData = function( msg ) {
-        var t = new Date().getTime();
-        gyroZ.append( t, msg.event['g'][2] );
-        power.append( t, msg.currentPower );
-
-        // only log speed if it actually changed
-        if ( msg.velocity != lastSpeed ) {
-            speed.append( t, msg.velocity );
-            lastSpeed = msg.velocity;
-        }
-
-        if ( msg.roundNumber > $scope.currentRound ) {
-            var roundTime = Math.abs( $scope.lastTime - msg.event.timeStamp );
-            $scope.lastTime = msg.event.timeStamp;
-            $scope.currentRound = msg.roundNumber;
-
-            console.log( roundTime );
-
-            roundTimeChart.options.data[0].dataPoints.push({ y: roundTime });
-            //TODO: trend of all the roundTimes (except the first one because it can be messed up if started too late)
-            roundTimeChart.render();
-        }
-    };
 
     // handle resizing --> adjust the canvas' width accordingly
     $scope.width = 600;
@@ -113,6 +134,7 @@ angular.module('myApp.view1', ['ngRoute'])
       smoothieSpeed.streamTo(document.getElementById("speedCanvas"));
       roundTimeChart.render();
 
+      //$stompie.setDebug(null);
       $stompie.using('http://localhost:8089/messages', function () {
 
         // The $scope bindings are updated for you so no need to $scope.$apply.
