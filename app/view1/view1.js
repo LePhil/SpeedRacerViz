@@ -13,7 +13,6 @@ angular.module('myApp.view1', ['ngRoute'])
     $scope.gyroColor = '#00ff00';
     $scope.powerColor = '#ff0000';
     $scope.speedColor = '#0000ff';
-    $scope.roundColor = '#7A00ff';
 
     var gridDef = {
           fillStyle:'rgba(0,0,0,0.40)',
@@ -38,55 +37,54 @@ angular.module('myApp.view1', ['ngRoute'])
           maxValue: 350,
           minValue: 0
         }),
-        smoothieRounds = new SmoothieChart({
-          interpolation:'step',
-          millisPerPixel:50,
-          labels:{ fontSize:14, precision:0 },
-          grid: {
-            fillStyle:'rgba(0,0,0,0.40)',
-            sharpLines: true,
-            millisPerLine: 2000
-          },
-          minValue: 0
-        }),
         gyroZ = new TimeSeries(),
         power = new TimeSeries(),
         speed = new TimeSeries(),
-        round = new TimeSeries(),
         lastSpeed = -1;
     $scope.lastTime;
     $scope.currentRound = 0;
+
+    var roundTimeChart = new CanvasJS.Chart("roundTimesContainer", {
+    		data: [{
+    			type: "spline",
+    			dataPoints: []
+    		}]
+    });
 
     // Add to SmoothieChart
     smoothieGyro.addTimeSeries(gyroZ, { strokeStyle: $scope.gyroColor, lineWidth:3 } );
     smoothieSpeed.addTimeSeries(power, { strokeStyle: $scope.powerColor , lineWidth:3 } );
     smoothieSpeed.addTimeSeries(speed, { strokeStyle: $scope.speedColor, lineWidth:3 } );
-    smoothieRounds.addTimeSeries(round, { strokeStyle: $scope.roundColor, lineWidth:3 } );
 
     var saveData = function( msg ) {
-      var t = new Date().getTime();
-      gyroZ.append( t, msg.event['g'][2] );
-      power.append( t, msg.currentPower );
+        var t = new Date().getTime();
+        gyroZ.append( t, msg.event['g'][2] );
+        power.append( t, msg.currentPower );
 
-      // only log speed if it actually changed
-      if ( msg.velocity != lastSpeed ) {
-        speed.append( t, msg.velocity );
-        lastSpeed = msg.velocity;
-      }
+        // only log speed if it actually changed
+        if ( msg.velocity != lastSpeed ) {
+            speed.append( t, msg.velocity );
+            lastSpeed = msg.velocity;
+        }
 
-      if ( msg.roundNumber > $scope.currentRound ) {
-        round.append( t, Math.abs($scope.lastTime - msg.event.timeStamp ) );
+        if ( msg.roundNumber > $scope.currentRound ) {
+            var roundTime = Math.abs( $scope.lastTime - msg.event.timeStamp );
+            $scope.lastTime = msg.event.timeStamp;
+            $scope.currentRound = msg.roundNumber;
 
-        $scope.lastTime = msg.event.timeStamp;
-        $scope.currentRound = msg.roundNumber;
-      }
-    }
+            console.log( roundTime );
 
+            roundTimeChart.options.data[0].dataPoints.push({ y: roundTime });
+            //TODO: trend of all the roundTimes (except the first one because it can be messed up if started too late)
+            roundTimeChart.render();
+        }
+    };
+
+    // handle resizing --> adjust the canvas' width accordingly
     $scope.width = 600;
     $scope.$watch(function(){
       return $window.innerWidth;
     }, function(value) {
-      console.log(value);
       $scope.width = value;
     });
 
@@ -95,11 +93,9 @@ angular.module('myApp.view1', ['ngRoute'])
       if ( $scope.isRunning )  {
         smoothieGyro.stop();
         smoothieSpeed.stop();
-        smoothieRounds.stop();
       } else {
         smoothieGyro.start();
         smoothieSpeed.start();
-        smoothieRounds.start();
       }
       $scope.isRunning = !$scope.isRunning;
     }
@@ -115,7 +111,7 @@ angular.module('myApp.view1', ['ngRoute'])
 
       smoothieGyro.streamTo(document.getElementById("gyroCanvas"));
       smoothieSpeed.streamTo(document.getElementById("speedCanvas"));
-      smoothieRounds.streamTo(document.getElementById("roundCanvas"));
+      roundTimeChart.render();
 
       $stompie.using('http://localhost:8089/messages', function () {
 
@@ -126,10 +122,9 @@ angular.module('myApp.view1', ['ngRoute'])
             // Save data point for visualisation (just the gyro value)
             saveData( msg );
         });
-
       });
-
     };
 
     $scope.start();
+
 }]);
