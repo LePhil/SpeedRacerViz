@@ -53,19 +53,31 @@ angular.module('myApp.view1', ['ngRoute'])
         			dataPoints: []
         		}]
         }),
+        raceStart = Date.now(),
+        fiveMinutesReached = false,
+        timeLabelSet = false,
         calcLowestAndAvg = function( points ) {
             var size = points.length,
                 sum = 0,
-                lowest = Number.MAX_VALUE;
+                lowest = Number.MAX_VALUE,
+                lowestIndex;
 
             // start at second data point because first round time is usually unusable
             for( var i = 0; i < size; i++ ) {
               var rt = points[i].y;
               if ( rt < lowest ) {
                 lowest = rt;
+                lowestIndex = i;
               }
               sum += rt;
             }
+
+            _.extend( points[lowestIndex], {
+                indexLabel: "Lowest",
+                markerType: "triangle",
+                markerColor: "#6B8E23",
+                markerSize: 12
+            });
 
             $scope.lowestRoundTime = lowest;
             $scope.averageRoundTime = sum / size-1;
@@ -84,11 +96,25 @@ angular.module('myApp.view1', ['ngRoute'])
             if ( msg.roundNumber > $scope.currentRound ) {
 
                 var roundTime = Math.abs( $scope.lastTime - msg.event.timeStamp );
+                var entry = { y: roundTime };
+
                 $scope.lastTime = msg.event.timeStamp;
                 $scope.currentRound = msg.roundNumber;
 
+                if ( !timeLabelSet && !fiveMinutesReached && msg.event.timeStamp - raceStart >= 1000*60*5 ) {
+                  fiveMinutesReached = false;
+                  timeLabelSet = true;
+
+                  _.extend( entry, {
+                      indexLabel: "Time over",
+                      markerType: "cross",
+                      markerColor: "red",
+                      markerSize: 12
+                  });
+                }
+
                 // add newest roundTime to 3rd graph
-                roundTimeChart.options.data[0].dataPoints.push({ y: roundTime });
+                roundTimeChart.options.data[0].dataPoints.push( entry );
 
                 calcLowestAndAvg( roundTimeChart.options.data[0].dataPoints );
 
