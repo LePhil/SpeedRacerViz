@@ -1,6 +1,6 @@
 'use strict';
 
-var myModule = angular.module('myApp.viz', []);
+var myModule = angular.module('SpeedRacerViz.viz', []);
 
 myModule.controller('vizCtrl', ['$scope', '$stompie', '$window', function($scope, $stompie, $window) {
     console.log(  "yay!");
