@@ -13,10 +13,32 @@
 </head>
 <body>
 
-  <div ng-view></div>
+  <div ng-app="myApp">
+    <div ng-controller="vizCtrl">
+
+      <h1>Round {{currentRound}}</h1>
+
+      <div class="buttons">
+          <button id="start" ng-click="start()">Start</button>
+          <button id="pause" ng-click="pause()">{{ isRunning ? "Pause" : "Unpause" }}</button>
+          <button id="stop" ng-click="stop()">Stop</button>
+      </div>
+
+
+      <h2><span style="color: {{ gyroColor }}">GyroZ</span></h2>
+      <canvas id="gyroCanvas" width={{width}} height="250"></canvas>
+
+      <h2><span style="color: {{ powerColor }}">Power</span> - <span style="color: {{ speedColor }}">Speed</span></h2>
+      <canvas id="speedCanvas" width={{width}} height="250"></canvas>
+
+      <h2>Round Times - Avg: {{ averageRoundTime > 0 ? averageRoundTime : "-" }}, Best: {{ lowestRoundTime > 0 ? lowestRoundTime : "-" }} </h2>
+
+      <div id="roundTimesContainer"></div>
+
+    </div>
+  </div>
 
   <script src="bower_components/angular/angular.js"></script>
-  <script src="bower_components/angular-route/angular-route.js"></script>
 
   <script src="bower_components/sockjs/sockjs.min.js"></script>
   <script src="bower_components/stomp-websocket/lib/stomp.min.js"></script>

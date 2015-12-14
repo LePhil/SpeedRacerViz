@@ -4,7 +4,4 @@
 angular.module('myApp', [
   'myApp.viz',
   'stompie'
-]).
-config(['$routeProvider', function($routeProvider) {
-  $routeProvider.otherwise({redirectTo: '/visualizer'});
-}]);
+]);

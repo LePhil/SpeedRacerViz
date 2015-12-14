@@ -1,15 +1,9 @@
 'use strict';
 
-angular.module('myApp.viz', ['ngRoute'])
+var myModule = angular.module('myApp.viz', []);
 
-.config(['$routeProvider', function($routeProvider) {
-  $routeProvider.when('/visualizer', {
-    templateUrl: 'visualizer/viz.html',
-    controller: 'vizCtrl'
-  });
-}])
-
-.controller('vizCtrl', ['$scope', '$stompie', '$window', function($scope, $stompie, $window) {
+myModule.controller('vizCtrl', ['$scope', '$stompie', '$window', function($scope, $stompie, $window) {
+    console.log(  "yay!");
     $scope.gyroColor = '#00ff00';
     $scope.powerColor = '#ff0000';
     $scope.speedColor = '#0000ff';
@@ -174,5 +168,4 @@ angular.module('myApp.viz', ['ngRoute'])
     };
 
     $scope.start();
-
 }]);
