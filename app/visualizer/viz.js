@@ -7,14 +7,8 @@ mainApp.factory('sharedService', ['$stompie', '$rootScope', function($stompie, $
 
     sharedService.message = '';
 
-    $stompie.using('http://localhost:8089/messages', function () {
+    sharedService.isRunning = true;
 
-      var subscription = $stompie.subscribe('/topic/simulator/news', function (msg) {
-
-          // Save data point for visualisation (just the gyro value)
-          sharedService.prepForBroadcast( msg );
-      });
-    });
 
     sharedService.prepForBroadcast = function(msg) {
         this.message = msg;
@@ -23,6 +17,27 @@ mainApp.factory('sharedService', ['$stompie', '$rootScope', function($stompie, $
 
     sharedService.propagateEvent = function() {
         $rootScope.$broadcast('receivedSensorEvent');
+    };
+
+    sharedService.stop = function() {
+      // Disconnect from the socket.
+      $stompie.disconnect(function () {
+          // Called once we're out...
+      });
+    };
+
+    sharedService.start = function() {
+      $stompie.using('http://localhost:8089/messages', function () {
+        var subscription = $stompie.subscribe('/topic/simulator/news', function (msg) {
+            // propagate the events to all controllers
+            sharedService.prepForBroadcast( msg );
+        });
+      });
+    };
+
+    sharedService.pause = function() {
+      this.isRunning = !this.isRunning;
+      $rootScope.$broadcast('simulationEvent');
     };
 
     return sharedService;
@@ -46,6 +61,14 @@ mainApp.controller('GyroGraphController', ['$scope', 'sharedService', '$window',
             minValue: -10000
         }),
         gyroZ = new TimeSeries();
+
+    $scope.$on('simulationEvent', function() {
+        if( sharedService.isRunning ) {
+            smoothieGyro.start();
+        } else {
+            smoothieGyro.stop();
+        }
+    });
 
     $scope.$on('receivedSensorEvent', function() {
         var t = new Date().getTime();
@@ -101,6 +124,13 @@ mainApp.controller('SpeedPowerGraphController', ['$scope', 'sharedService', '$wi
     smoothieSpeed.addTimeSeries(power, { strokeStyle: $scope.powerColor , lineWidth:3 } );
     smoothieSpeed.addTimeSeries(speed, { strokeStyle: $scope.speedColor, lineWidth:3 } );
 
+    $scope.$on('simulationEvent', function() {
+        if( sharedService.isRunning ) {
+            smoothieSpeed.start();
+        } else {
+            smoothieSpeed.stop();
+        }
+    });
 
     $scope.$on('receivedSensorEvent', function() {
         var t = new Date().getTime();
@@ -118,8 +148,6 @@ mainApp.controller('SpeedPowerGraphController', ['$scope', 'sharedService', '$wi
 }]);
 
 mainApp.controller('RoundTimesGraphController', ['$scope', 'sharedService', '$window', function($scope, sharedService, $window) {
-    $scope.currentRound = 0;
-
     $scope.lowestRoundTime = -1;
 
     var roundTimeChart = new CanvasJS.Chart("roundTimesContainer", {
@@ -131,6 +159,7 @@ mainApp.controller('RoundTimesGraphController', ['$scope', 'sharedService', '$wi
         raceStart = Date.now(),
         fiveMinutesReached = false,
         timeLabelSet = false,
+        currentRound = 0,
         calcLowest = function( points ) {
             var size = points.length,
                 lowest = Number.MAX_VALUE,
@@ -157,13 +186,14 @@ mainApp.controller('RoundTimesGraphController', ['$scope', 'sharedService', '$wi
         saveData = function( msg ) {
             var t = new Date().getTime();
 
-            if ( msg.roundNumber > $scope.currentRound ) {
+            // simple way the figure out round change
+            if ( msg.roundNumber > currentRound ) {
+                currentRound = msg.roundNumber;
 
                 var roundTime = Math.abs( $scope.lastTime - msg.event.timeStamp );
                 var entry = { y: roundTime };
 
                 $scope.lastTime = msg.event.timeStamp;
-                $scope.currentRound = msg.roundNumber;
 
                 if ( !timeLabelSet && !fiveMinutesReached && msg.event.timeStamp - raceStart >= 1000*60*5 ) {
                   fiveMinutesReached = false;
@@ -182,7 +212,9 @@ mainApp.controller('RoundTimesGraphController', ['$scope', 'sharedService', '$wi
 
                 calcLowest( roundTimeChart.options.data[0].dataPoints );
 
-                roundTimeChart.render();
+                if ( sharedService.isRunning ) {
+                    roundTimeChart.render();
+                }
             }
         };
 
@@ -194,44 +226,21 @@ mainApp.controller('RoundTimesGraphController', ['$scope', 'sharedService', '$wi
     roundTimeChart.render();
 }]);
 
-mainApp.controller('vizCtrl', ['$scope', '$stompie', '$window', function($scope, $stompie, $window) {
-
-    $scope.lastTime;
+mainApp.controller('InputController', ['$scope', 'sharedService', '$stompie', '$window', function($scope, sharedService, $stompie, $window) {
+    $scope.isRunning = true;
     $scope.currentRound = 0;
 
-    $scope.isRunning = true;
-    $scope.pause = function() {
-      if ( $scope.isRunning )  {
-        smoothieGyro.stop();
-        smoothieSpeed.stop();
-      } else {
-        smoothieGyro.start();
-        smoothieSpeed.start();
-      }
-      $scope.isRunning = !$scope.isRunning;
-    }
+    $scope.$on('simulationEvent', function() {
+      $scope.isRunning = sharedService.isRunning;
+    });
 
-    $scope.stop = function() {
-      // Disconnect from the socket.
-      $stompie.disconnect(function () {
-          // Called once you're out...
-      });
-    };
+    $scope.$on('receivedSensorEvent', function() {
+        $scope.currentRound = sharedService.message.roundNumber;
+    });
 
-    $scope.start = function() {
-      /*
-      $stompie.using('http://localhost:8089/messages', function () {
-
-        // The $scope bindings are updated for you so no need to $scope.$apply.
-        // The subscription object is returned by the method.
-        var subscription = $stompie.subscribe('/topic/simulator/news', function (msg) {
-
-            // Save data point for visualisation (just the gyro value)
-            saveData( msg );
-        });
-      });
-      */
-    };
+    $scope.pause = function() { sharedService.pause(); };
+    $scope.stop = function() {  sharedService.stop(); };
+    $scope.start = function() { sharedService.start(); };
 
     $scope.start();
 }]);
