@@ -1,18 +1,35 @@
 'use strict';
 
-var myModule = angular.module('SpeedRacerViz.viz', []);
+var mainApp = angular.module('SpeedRacerViz.viz', []);
 
-myModule.controller('vizCtrl', ['$scope', '$stompie', '$window', function($scope, $stompie, $window) {
-    console.log(  "yay!");
+mainApp.factory('sharedService', ['$stompie', '$rootScope', function($stompie, $rootScope) {
+    var sharedService = {};
+
+    sharedService.message = '';
+
+    $stompie.using('http://localhost:8089/messages', function () {
+
+      var subscription = $stompie.subscribe('/topic/simulator/news', function (msg) {
+
+          // Save data point for visualisation (just the gyro value)
+          sharedService.prepForBroadcast( msg );
+      });
+    });
+
+    sharedService.prepForBroadcast = function(msg) {
+        this.message = msg;
+        this.propagateEvent();
+    };
+
+    sharedService.propagateEvent = function() {
+        $rootScope.$broadcast('receivedSensorEvent');
+    };
+
+    return sharedService;
+}]);
+
+mainApp.controller('GyroGraphController', ['$scope', 'sharedService', '$window', function($scope, sharedService, $window) {
     $scope.gyroColor = '#00ff00';
-    $scope.powerColor = '#ff0000';
-    $scope.speedColor = '#0000ff';
-
-    $scope.lastTime;
-    $scope.currentRound = 0;
-
-    $scope.lowestRoundTime = -1;
-    $scope.averageRoundTime = -1;
 
     var gridDef = {
             fillStyle:'rgba(0,0,0,0.40)',
@@ -28,6 +45,37 @@ myModule.controller('vizCtrl', ['$scope', '$stompie', '$window', function($scope
             maxValue: 10000,
             minValue: -10000
         }),
+        gyroZ = new TimeSeries();
+
+    $scope.$on('receivedSensorEvent', function() {
+        var t = new Date().getTime();
+        gyroZ.append( t, sharedService.message.event['g'][2] );
+
+    });
+
+    // handle resizing --> adjust the canvas' width accordingly
+    $scope.width = 600;
+    $scope.$watch(function(){
+      return $window.innerWidth;
+    }, function(value) {
+      $scope.width = value;
+    });
+
+    smoothieGyro.addTimeSeries(gyroZ, { strokeStyle: $scope.gyroColor, lineWidth:3 } );
+
+    smoothieGyro.streamTo(document.getElementById("gyroCanvas"));
+}]);
+
+mainApp.controller('SpeedPowerGraphController', ['$scope', 'sharedService', '$window', function($scope, sharedService, $window) {
+    $scope.powerColor = '#ff0000';
+    $scope.speedColor = '#0000ff';
+
+    var gridDef = {
+            fillStyle:'rgba(0,0,0,0.40)',
+            sharpLines: true,
+            millisPerLine: 2000,
+            verticalSections: 8
+        },
         smoothieSpeed = new SmoothieChart({
             interpolation:'linear',
             millisPerPixel: 20,
@@ -37,22 +85,54 @@ myModule.controller('vizCtrl', ['$scope', '$stompie', '$window', function($scope
             maxValue: 350,
             minValue: 0
         }),
-        gyroZ = new TimeSeries(),
         power = new TimeSeries(),
         speed = new TimeSeries(),
-        lastSpeed = -1,
-        roundTimeChart = new CanvasJS.Chart("roundTimesContainer", {
-        		data: [{
-        			type: "spline",
-        			dataPoints: []
-        		}]
+        lastSpeed = -1;
+
+    // handle resizing --> adjust the canvas' width accordingly
+    $scope.width = 600;
+    $scope.$watch(function(){
+      return $window.innerWidth;
+    }, function(value) {
+      $scope.width = value;
+    });
+
+    // Add to SmoothieChart
+    smoothieSpeed.addTimeSeries(power, { strokeStyle: $scope.powerColor , lineWidth:3 } );
+    smoothieSpeed.addTimeSeries(speed, { strokeStyle: $scope.speedColor, lineWidth:3 } );
+
+
+    $scope.$on('receivedSensorEvent', function() {
+        var t = new Date().getTime();
+        power.append( t, sharedService.message.currentPower );
+
+        // only log speed if it actually changed
+        if ( sharedService.message.velocity != lastSpeed ) {
+            speed.append( t, sharedService.message.velocity );
+            lastSpeed = sharedService.message.velocity;
+        }
+    });
+
+    smoothieSpeed.streamTo(document.getElementById("speedCanvas"));
+
+}]);
+
+mainApp.controller('RoundTimesGraphController', ['$scope', 'sharedService', '$window', function($scope, sharedService, $window) {
+    $scope.currentRound = 0;
+
+    $scope.lowestRoundTime = -1;
+
+    var roundTimeChart = new CanvasJS.Chart("roundTimesContainer", {
+            data: [{
+              type: "spline",
+              dataPoints: []
+            }]
         }),
         raceStart = Date.now(),
         fiveMinutesReached = false,
         timeLabelSet = false,
-        calcLowestAndAvg = function( points ) {
+        calcLowest = function( points ) {
             var size = points.length,
-                sum = 0,
                 lowest = Number.MAX_VALUE,
                 lowestIndex;
 
@@ -63,7 +143,6 @@ myModule.controller('vizCtrl', ['$scope', '$stompie', '$window', function($scope
                 lowest = rt;
                 lowestIndex = i;
               }
-              sum += rt;
             }
 
             _.extend( points[lowestIndex], {
@@ -74,18 +153,9 @@ myModule.controller('vizCtrl', ['$scope', '$stompie', '$window', function($scope
             });
 
             $scope.lowestRoundTime = lowest;
-            $scope.averageRoundTime = sum / size-1;
         },
         saveData = function( msg ) {
             var t = new Date().getTime();
-            gyroZ.append( t, msg.event['g'][2] );
-            power.append( t, msg.currentPower );
-
-            // only log speed if it actually changed
-            if ( msg.velocity != lastSpeed ) {
-                speed.append( t, msg.velocity );
-                lastSpeed = msg.velocity;
-            }
 
             if ( msg.roundNumber > $scope.currentRound ) {
 
@@ -110,24 +180,24 @@ myModule.controller('vizCtrl', ['$scope', '$stompie', '$window', function($scope
                 // add newest roundTime to 3rd graph
                 roundTimeChart.options.data[0].dataPoints.push( entry );
 
-                calcLowestAndAvg( roundTimeChart.options.data[0].dataPoints );
+                calcLowest( roundTimeChart.options.data[0].dataPoints );
 
                 roundTimeChart.render();
             }
         };
 
-    // Add to SmoothieChart
-    smoothieGyro.addTimeSeries(gyroZ, { strokeStyle: $scope.gyroColor, lineWidth:3 } );
-    smoothieSpeed.addTimeSeries(power, { strokeStyle: $scope.powerColor , lineWidth:3 } );
-    smoothieSpeed.addTimeSeries(speed, { strokeStyle: $scope.speedColor, lineWidth:3 } );
 
-    // handle resizing --> adjust the canvas' width accordingly
-    $scope.width = 600;
-    $scope.$watch(function(){
-      return $window.innerWidth;
-    }, function(value) {
-      $scope.width = value;
+    $scope.$on('receivedSensorEvent', function() {
+        saveData(sharedService.message);
     });
+
+    roundTimeChart.render();
+}]);
+
+mainApp.controller('vizCtrl', ['$scope', '$stompie', '$window', function($scope, $stompie, $window) {
+
+    $scope.lastTime;
+    $scope.currentRound = 0;
 
     $scope.isRunning = true;
     $scope.pause = function() {
@@ -149,12 +219,7 @@ myModule.controller('vizCtrl', ['$scope', '$stompie', '$window', function($scope
     };
 
     $scope.start = function() {
-
-      smoothieGyro.streamTo(document.getElementById("gyroCanvas"));
-      smoothieSpeed.streamTo(document.getElementById("speedCanvas"));
-      roundTimeChart.render();
-
-      //$stompie.setDebug(null);
+      /*
       $stompie.using('http://localhost:8089/messages', function () {
 
         // The $scope bindings are updated for you so no need to $scope.$apply.
@@ -165,6 +230,7 @@ myModule.controller('vizCtrl', ['$scope', '$stompie', '$window', function($scope
             saveData( msg );
         });
       });
+      */
     };
 
     $scope.start();

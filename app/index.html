@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" ng-app="myApp" class="no-js">
+<html lang="en" ng-app="SpeedRacerViz" class="no-js">
 <head>
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -13,30 +13,32 @@
 </head>
 <body>
 
-  <div ng-app="myApp">
-    <div ng-controller="vizCtrl">
+  <div ng-controller="vizCtrl">
+    <h1>Round {{currentRound}}</h1>
 
-      <h1>Round {{currentRound}}</h1>
-
-      <div class="buttons">
-          <button id="start" ng-click="start()">Start</button>
-          <button id="pause" ng-click="pause()">{{ isRunning ? "Pause" : "Unpause" }}</button>
-          <button id="stop" ng-click="stop()">Stop</button>
-      </div>
-
-
-      <h2><span style="color: {{ gyroColor }}">GyroZ</span></h2>
-      <canvas id="gyroCanvas" width={{width}} height="250"></canvas>
-
-      <h2><span style="color: {{ powerColor }}">Power</span> - <span style="color: {{ speedColor }}">Speed</span></h2>
-      <canvas id="speedCanvas" width={{width}} height="250"></canvas>
-
-      <h2>Round Times - Avg: {{ averageRoundTime > 0 ? averageRoundTime : "-" }}, Best: {{ lowestRoundTime > 0 ? lowestRoundTime : "-" }} </h2>
-
-      <div id="roundTimesContainer"></div>
-
+    <div class="buttons">
+        <button id="start" ng-click="start()">Start</button>
+        <button id="pause" ng-click="pause()">{{ isRunning ? "Pause" : "Unpause" }}</button>
+        <button id="stop" ng-click="stop()">Stop</button>
     </div>
   </div>
+
+  <div ng-controller="GyroGraphController">
+    <h2><span style="color: {{ gyroColor }}">GyroZ</span></h2>
+    <canvas id="gyroCanvas" width={{width}} height="250"></canvas>
+  </div>
+
+  <div ng-controller="SpeedPowerGraphController">
+    <h2><span style="color: {{ powerColor }}">Power</span> - <span style="color: {{ speedColor }}">Speed</span></h2>
+    <canvas id="speedCanvas" width={{width}} height="250"></canvas>
+  </div>
+
+  <div ng-controller="RoundTimesGraphController">
+    <h2>Round Times: Best = {{ lowestRoundTime > 0 && lowestRoundTime < 999999 ? lowestRoundTime : "-" }} </h2>
+
+    <div id="roundTimesContainer"></div>
+  </div>
+
 
   <script src="bower_components/angular/angular.js"></script>
 
