@@ -160,6 +160,7 @@ mainApp.controller('RoundTimesGraphController', ['$scope', 'sharedService', '$wi
         fiveMinutesReached = false,
         timeLabelSet = false,
         currentRound = 0,
+        lowestIndexSoFar = -1,
         calcLowest = function( points ) {
             var size = points.length,
                 lowest = Number.MAX_VALUE,
@@ -174,10 +175,21 @@ mainApp.controller('RoundTimesGraphController', ['$scope', 'sharedService', '$wi
               }
             }
 
+            // remove previous lowest point if new lowest point was found
+            if ( lowestIndexSoFar >= 0 ) {
+                _.extend( points[lowestIndexSoFar], {
+                    indexLabel: "",
+                    markerType: "circle",
+                    markerColor: "",
+                    markerSize: 8
+                });
+            }
+            lowestIndexSoFar = lowestIndex;
+
             _.extend( points[lowestIndex], {
                 indexLabel: "Lowest",
                 markerType: "triangle",
-                markerColor: "#6B8E23",
+                markerColor: "green",
                 markerSize: 12
             });
 
